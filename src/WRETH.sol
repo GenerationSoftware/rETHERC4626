@@ -17,8 +17,8 @@ contract WRETH is IWRETH {
     string constant public name = "Wrapped Rocket Pool ETH";
     string constant public symbol = "wrETH";
 
-    // rETH:ETH exchange rate
-    uint256 public rate;
+    // last recorded rETH:ETH exchange rate
+    uint256 public oracleRate;
 
     // Balances denominated in rETH
     uint256 public tokenTotalSupply;
@@ -48,8 +48,8 @@ contract WRETH is IWRETH {
         rETH = _rETH;
         oracle = _oracle;
         // Record the initial rate
-        rate = oracle.rate();
-        require(rate != 0);
+        oracleRate = oracle.rate();
+        require(oracleRate != 0);
         // Domain separator
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
@@ -59,18 +59,23 @@ contract WRETH is IWRETH {
     // Rebasing functions
     //
 
+    /// @notice Returns the current rETH:wrETH rate
+    function rate() public view virtual returns (uint256) {
+        return oracleRate;
+    }
+
     /// @notice Retrieves the current rETH rate from oracle and rebases balances and supply
-    function rebase() external {
+    function rebase() external virtual {
         uint256 newRate = oracle.rate();
         // Nothing to do
-        if (newRate == rate) {
+        if (newRate == oracleRate) {
             return;
         }
         require(newRate != 0);
         // Emit event
-        emit Rebase(rate, newRate);
+        emit Rebase(oracleRate, newRate);
         // Update the rate
-        rate = newRate;
+        oracleRate = newRate;
     }
 
     /// @notice Transfers rETH from the caller and mints wrETH
@@ -279,12 +284,12 @@ contract WRETH is IWRETH {
 
     /// @dev Calculates the amount of rETH the supplied value of ETH is worth
     function tokensForWreth(uint256 _eth) public view returns (uint256) {
-        return _eth * 1 ether / rate;
+        return _eth * 1 ether / rate();
     }
 
     /// @dev Calculates the amount of ETH the supplied value of rETH is worth
     function wrethForTokens(uint256 _tokens) public view returns (uint256) {
-        return _tokens * rate / 1 ether;
+        return _tokens * rate() / 1 ether;
     }
 
     /// @dev Computes and returns the EIP-712 domain separator
